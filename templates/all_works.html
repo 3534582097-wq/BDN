@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="section" style="padding-top: 8rem;">
+    <div class="container">
+        <h2 class="section-title">全部作品</h2>
+        <p class="section-sub">浏览所有已通过审核的作品</p>
+        <div class="search-bar" style="display:flex; gap:1rem; margin-bottom:2rem; flex-wrap:wrap; align-items:center;">
+            <input type="text" id="searchInput" placeholder="搜索标题或作者..." oninput="filterWorks()" 
+                   style="flex:1; min-width:200px; padding:0.8rem 1.5rem; border:1px solid var(--border-light); border-radius:50px; font-size:1rem; outline:none;">
+            <div class="filter-buttons" style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                {% set cats = ['全部', '摄影', '征文', '海报', '诗歌', '绘画', '手工制品'] %}
+                {% for cat in cats %}
+                <button class="filter-btn {% if loop.first %}active{% endif %}" data-type="{{ cat }}"
+                        style="padding:0.5rem 1.4rem; border-radius:50px; background:#fff; border:1px solid var(--border-light); font-size:0.9rem; font-weight:500; color:var(--text-secondary); cursor:pointer; transition:0.2s;">
+                    {{ cat }}
+                </button>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="work-grid images">
+            {% for work in works %}
+            <div class="work-card" data-type="{{ work.category }}" data-id="{{ work.id }}" onclick="showModal({{ work.id }})">
+                {% if work.image %}
+                <div class="card-img" style="background-image: url('/static/uploads/{{ work.image }}');">
+                    <span class="card-type-badge">{{ work.category }}</span>
+                </div>
+                {% else %}
+                <div class="card-img" style="display:flex; align-items:center; justify-content:center; height:120px; background:#f0f0f0;">
+                    <span style="font-size:2.5rem;">📄</span>
+                    <span class="card-type-badge">{{ work.category }}</span>
+                </div>
+                {% endif %}
+                <div class="card-body">
+                    <h3>{{ work.title }}</h3>
+                    <p class="card-author">{{ work.author }}</p>
+                    {% if work.description %}<p class="card-desc">{{ work.description }}</p>{% endif %}
+                    <div class="card-footer">
+                        <span class="card-stars">{% for i in range(work.votes) %}★{% else %}暂无{% endfor %}</span>
+                        <span class="card-vote-count">{{ work.votes }} 票</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+<script>
+    function filterWorks() {
+        const search = document.getElementById('searchInput').value.toLowerCase();
+        const activeBtn = document.querySelector('.filter-btn.active');
+        const typeFilter = activeBtn ? activeBtn.dataset.type : '全部';
+        document.querySelectorAll('.work-card').forEach(card => {
+            const title = (card.querySelector('h3')?.textContent || '').toLowerCase();
+            const author = (card.querySelector('.card-author')?.textContent || '').toLowerCase();
+            const type = card.dataset.type;
+            const matchSearch = title.includes(search) || author.includes(search);
+            const matchType = typeFilter === '全部' || type === typeFilter;
+            card.style.display = (matchSearch && matchType) ? 'flex' : 'none';
+        });
+    }
+
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.filter-btn').forEach(b => {
+                b.classList.remove('active');
+                b.style.background = '#fff';
+                b.style.color = 'var(--text-secondary)';
+                b.style.border = '1px solid var(--border-light)';
+                b.style.boxShadow = 'none';
+            });
+            this.classList.add('active');
+            this.style.background = 'var(--primary)';
+            this.style.color = '#fff';
+            this.style.border = '1px solid var(--primary)';
+            this.style.boxShadow = '0 4px 12px rgba(29,90,62,0.3)';
+            filterWorks();
+        });
+    });
+
+    // 初始化高亮
+    window.addEventListener('load', () => {
+        document.querySelector('.filter-btn.active')?.click();
+    });
+</script>
+{% endblock %}

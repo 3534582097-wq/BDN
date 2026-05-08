@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="section" style="padding-top: 8rem;">
+    <div class="container">
+        <h2 class="section-title">作品评审（盲评）</h2>
+        <p class="section-sub">点击卡片或左侧复选框选择优秀作品（可多选）</p>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for cat, msg in messages %}
+                    <div class="flash flash-{{ cat }}">{{ msg }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="post">
+            <div class="review-grid">
+                {% for work in works %}
+                <div class="review-card" id="card-{{ work.id }}">
+                    <label class="review-card-label" for="cb-{{ work.id }}">
+                        <input type="checkbox" name="works" value="{{ work.id }}" id="cb-{{ work.id }}" class="work-checkbox" onchange="updateCount()">
+                        <span class="checkmark"></span>
+                        <div class="review-card-inner">
+                            {% if work.image %}
+                            <div class="review-img" style="background-image: url('{{ url_for('static', filename='uploads/' + work.image) }}');"></div>
+                            {% else %}
+                            <div class="review-img" style="background:#eef2ef; display:flex; align-items:center; justify-content:center;">
+                                <span style="font-size:2.5rem; color:#888;">📄</span>
+                            </div>
+                            {% endif %}
+                            <div class="review-meta">
+                                <span class="card-type">{{ work.category }}</span>
+                                <h4>{{ work.title }}</h4>
+                                {% if work.description %}
+                                <p>{{ work.description[:80] }}{% if work.description|length > 80 %}…{% endif %}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </label>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="review-submit-bar" style="position:sticky; bottom:0; background:rgba(255,255,255,0.95); backdrop-filter:blur(12px); padding:1rem 2rem; border-radius:var(--radius); margin-top:2rem; display:flex; justify-content:space-between; align-items:center;">
+                <span id="selectedCount" class="vote-display" style="padding:0.5rem 1.5rem; font-size:1rem;">已选 0 / {{ works|length }}</span>
+                <button type="submit" class="btn btn-primary">提交评审结果</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .review-card {
+        position: relative;
+        background: white;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+        transition: 0.25s ease;
+        border: 2px solid transparent;
+        cursor: pointer;
+    }
+    .review-card:hover {
+        box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+    .review-card.selected {
+        border-color: var(--primary);
+        background: rgba(29, 90, 62, 0.02);
+    }
+    .review-card-label {
+        display: flex;
+        flex-direction: column;
+        cursor: pointer;
+        position: relative;
+        padding: 1rem;
+    }
+    .work-checkbox {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        width: 24px;
+        height: 24px;
+        opacity: 0;
+        z-index: 2;
+        cursor: pointer;
+    }
+    .checkmark {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        width: 24px;
+        height: 24px;
+        background: white;
+        border: 2px solid #ccc;
+        border-radius: 50%;
+        transition: 0.2s;
+        z-index: 1;
+    }
+    .work-checkbox:checked + .checkmark {
+        background: var(--primary);
+        border-color: var(--primary);
+    }
+    .work-checkbox:checked + .checkmark::after {
+        content: "";
+        position: absolute;
+        left: 7px;
+        top: 3px;
+        width: 6px;
+        height: 12px;
+        border: solid white;
+        border-width: 0 2px 2px 0;
+        transform: rotate(45deg);
+    }
+    .review-img {
+        width: 100%;
+        height: 180px;
+        background-size: cover;
+        background-position: center;
+        border-radius: 10px;
+        background-color: #f0f0f0;
+    }
+    .review-meta {
+        padding: 0.8rem 0.2rem 0;
+    }
+    .review-meta h4 {
+        font-size: 1rem;
+        font-weight: 700;
+        margin: 0.2rem 0;
+    }
+    .review-meta p {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        line-height: 1.4;
+    }
+    .card-type {
+        display: inline-block;
+        background: var(--primary-light);
+        color: var(--primary);
+        padding: 0.15rem 0.8rem;
+        border-radius: 50px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    @media (max-width: 768px) {
+        .review-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<script>
+    // 更新已选数量并高亮卡片
+    function updateCount() {
+        const checked = document.querySelectorAll('.work-checkbox:checked').length;
+        const total = {{ works|length }};
+        document.getElementById('selectedCount').textContent = `已选 ${checked} / ${total}`;
+        // 同步高亮卡片
+        document.querySelectorAll('.work-checkbox').forEach(cb => {
+            const card = cb.closest('.review-card');
+            if (card) {
+                card.classList.toggle('selected', cb.checked);
+            }
+        });
+    }
+
+    // 点击卡片任意位置也能切换勾选（避开复选框本身以免重复触发）
+    document.querySelectorAll('.review-card').forEach(card => {
+        card.addEventListener('click', function(e) {
+            // 如果点击的是复选框本身，不处理（由复选框自己触发）
+            if (e.target.tagName === 'INPUT') return;
+            const checkbox = this.querySelector('.work-checkbox');
+            if (checkbox) {
+                checkbox.checked = !checkbox.checked;
+                // 手动触发 change 事件以更新计数
+                checkbox.dispatchEvent(new Event('change'));
+            }
+        });
+    });
+
+    // 页面加载完成后初始化计数
+    window.addEventListener('load', updateCount);
+</script>
+{% endblock %}

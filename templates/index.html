@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+    <div class="hero-badge">🌿 世界候鸟日 · 世界生物多样性日</div>
+    <h1>微光成炬，<span class="highlight">羽映万生</span></h1>
+    <p>以青春创意响应全球生态保护号召，展现林学院学子创新博雅的风采</p>
+    <div class="hero-actions">
+        <a href="{{ url_for('all_works') }}" class="btn btn-primary">浏览全部作品</a>
+        <a href="{{ url_for('recruit') }}" class="btn btn-secondary">加入宣讲团</a>
+    </div>
+    <div class="stats-bar">
+        <div class="stat-item">
+            <div class="stat-number">{{ works_count }}</div>
+            <div class="stat-label">作品总数</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number">6</div>
+            <div class="stat-label">作品类别</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number">{{ total_votes }}</div>
+            <div class="stat-label">总投票数</div>
+        </div>
+    </div>
+</section>
+
+{% if results_published %}
+<div class="section bg-soft">
+    <div class="container">
+        <h2 class="section-title">优秀作品展示</h2>
+        <p class="section-sub">根据评审结果推荐，按投票数排序</p>
+        {% for section in sections %}
+        <div style="margin-bottom: 3rem;">
+            <h3>{{ section.title }}</h3>
+            <div class="work-grid {{ 'images' if section.type == 'image' else 'texts' }}">
+                {% for work in section.works %}
+                <div class="work-card" data-id="{{ work.id }}" onclick="showModal({{ work.id }})">
+                    {% if work.image %}
+                    <div class="card-img" style="background-image: url('/static/uploads/{{ work.image }}');">
+                        <span class="card-type-badge">{{ work.category }}</span>
+                    </div>
+                    {% else %}
+                    <div class="card-img" style="display:flex; align-items:center; justify-content:center; height:120px; background:#f0f0f0;">
+                        <span style="font-size:2.5rem;">📄</span>
+                        <span class="card-type-badge">{{ work.category }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="card-body">
+                        <h3>{{ work.title }}</h3>
+                        <p class="card-author">{{ work.author }}</p>
+                        {% if work.description %}<p class="card-desc">{{ work.description }}</p>{% endif %}
+                        <div class="card-footer">
+                            <span class="card-stars">{% for i in range(work.votes) %}★{% else %}暂无投票{% endfor %}</span>
+                            <span class="card-vote-count">{{ work.votes }} 票</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state"><div class="empty-icon">🕊️</div><h3>暂无已发布的作品</h3></div>
+        {% endfor %}
+    </div>
+</div>
+{% else %}
+<div class="section">
+    <div class="container">
+        <h2 class="section-title">最新投稿</h2>
+        <p class="section-sub">所有作品按时间倒序排列</p>
+        {% if works %}
+        <div class="work-grid images">
+            {% for work in works %}
+            <div class="work-card" data-id="{{ work.id }}" onclick="showModal({{ work.id }})">
+                {% if work.image %}
+                <div class="card-img" style="background-image: url('/static/uploads/{{ work.image }}');">
+                    <span class="card-type-badge">{{ work.category }}</span>
+                </div>
+                {% else %}
+                <div class="card-img" style="display:flex; align-items:center; justify-content:center; height:120px; background:#f0f0f0;">
+                    <span style="font-size:2.5rem;">📄</span>
+                    <span class="card-type-badge">{{ work.category }}</span>
+                </div>
+                {% endif %}
+                <div class="card-body">
+                    <h3>{{ work.title }}</h3>
+                    <p class="card-author">{{ work.author }}</p>
+                    {% if work.description %}<p class="card-desc">{{ work.description }}</p>{% endif %}
+                    <div class="card-footer">
+                        <span class="card-stars">{% for i in range(work.votes) %}★{% else %}暂无投票{% endfor %}</span>
+                        <span class="card-vote-count">{{ work.votes }} 票</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state"><div class="empty-icon">🌱</div><h3>暂无作品</h3></div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

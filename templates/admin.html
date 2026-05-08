@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="section" style="padding-top: 8rem;">
+    <div class="container">
+        <h2 class="section-title">管理后台</h2>
+        <p>管理员 <a href="{{ url_for('logout') }}">退出</a></p>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for cat, msg in messages %}
+                    <div class="flash flash-{{ cat }}">{{ msg }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="admin-card">
+            <h3>📤 上传作品</h3>
+            <form method="post" enctype="multipart/form-data">
+                <input type="hidden" name="upload" value="1">
+                <div class="form-group"><label>标题</label><input type="text" name="title" required></div>
+                <div class="form-group"><label>作者</label><input type="text" name="author" required></div>
+                <div class="form-group"><label>类别</label><select name="category">
+                    <option>摄影</option><option>征文</option><option>海报</option><option>诗歌</option><option>绘画</option><option>手工制品</option>
+                </select></div>
+                <div class="form-group"><label>简介</label><textarea name="description"></textarea></div>
+                <div class="form-group"><label>正文（征文/诗歌）</label><textarea name="content"></textarea></div>
+                <div class="form-group"><label>图片</label><input type="file" name="image" accept="image/*"></div>
+                <div class="form-group"><label>附件</label><input type="file" name="file"></div>
+                <button type="submit" class="btn btn-primary">上传</button>
+            </form>
+        </div>
+
+        <div class="admin-card">
+            <h3>📂 管理作品</h3>
+            <table style="width:100%; border-collapse:collapse;">
+                <tr style="border-bottom:2px solid var(--primary-light);">
+                    <th>标题</th><th>作者</th><th>类别</th><th>票数</th><th>状态</th><th>操作</th>
+                </tr>
+                {% for w in works %}
+                <tr style="border-bottom:1px solid var(--border-light);">
+                    <td>{{ w.title }}</td><td>{{ w.author }}</td><td>{{ w.category }}</td><td>{{ w.votes }}</td>
+                    <td>{{ w.status }}</td>
+                    <td>
+                        <form method="post" style="display:inline;"><input type="hidden" name="delete_work" value="{{ w.id }}"><button type="submit" onclick="return confirm('确认删除？')">删除</button></form>
+                        {% if session.is_super %}
+                        <form method="post" action="{{ url_for('approve_work', work_id=w.id) }}" style="display:inline;"><button type="submit">通过</button></form>
+                        <form method="post" action="{{ url_for('reject_work', work_id=w.id) }}" style="display:inline;"><button type="submit">拒绝</button></form>
+                        <form method="post" action="{{ url_for('recommend_work', work_id=w.id) }}" style="display:inline;"><button type="submit">{{ '取消推荐' if w.is_recommended else '推荐' }}</button></form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+
+        {% if session.is_super %}
+        <div class="admin-card">
+            <h3>⚙️ 系统设置</h3>
+            <form method="post" style="display:inline-block; margin-right:1rem;">
+                <input type="hidden" name="toggle_review" value="1">
+                <button type="submit" class="btn btn-sm btn-primary">{{ '关闭评审' if review_open == 'true' else '开启评审' }}</button>
+            </form>
+            <form method="post" style="display:inline-block; margin-right:1rem;">
+                <input type="hidden" name="publish_results" value="1">
+                <button type="submit" class="btn btn-sm btn-primary">{{ '取消发布' if results_published == 'true' else '发布结果' }}</button>
+            </form>
+            <form method="post" style="display:inline-block; margin-right:1rem;">
+                <input type="hidden" name="reset_votes" value="1">
+                <button type="submit" class="btn btn-sm btn-secondary" onclick="return confirm('确认重置所有票数？')">重置投票</button>
+            </form>
+        </div>
+
+        <div class="admin-card">
+            <h3>👥 评审员</h3>
+            <form method="post" style="display:flex; gap:1rem; align-items:flex-end;">
+                <div class="form-group"><label>用户名</label><input type="text" name="username" required></div>
+                <div class="form-group"><label>密码</label><input type="password" name="password" required></div>
+                <button type="submit" name="add_reviewer" class="btn btn-primary btn-sm">添加</button>
+            </form>
+            <ul>{% for r in reviewers %}<li>{{ r.username }} ({% if r.has_voted %}已投票{% else %}未投票{% endif %})</li>{% endfor %}</ul>
+        </div>
+
+        <div class="admin-card">
+            <h3>📄 编辑声明</h3>
+            <form method="post">
+                <textarea name="declaration_content" style="width:100%; min-height:120px;">{{ declaration.value if declaration else '' }}</textarea>
+                <button type="submit" name="edit_declaration" class="btn btn-primary btn-sm">保存</button>
+            </form>
+        </div>
+
+        <div class="admin-card">
+            <h3>📢 编辑宣讲团</h3>
+            <form method="post">
+                <textarea name="recruit_content" style="width:100%; min-height:120px;">{{ recruit_content.value if recruit_content else '' }}</textarea>
+                <button type="submit" name="edit_recruit" class="btn btn-primary btn-sm">保存</button>
+            </form>
+        </div>
+
+        <div class="admin-card">
+            <h3>👤 添加管理员</h3>
+            <form method="post" style="display:flex; gap:1rem; align-items:flex-end;">
+                <div class="form-group"><label>用户名</label><input type="text" name="new_admin_username" required></div>
+                <div class="form-group"><label>密码</label><input type="password" name="new_admin_password" required></div>
+                <button type="submit" name="add_admin" class="btn btn-primary btn-sm">添加</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

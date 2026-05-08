@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}微光成炬，羽映万生{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <nav class="navbar" id="navbar">
+        <div class="nav-inner">
+            <a href="{{ url_for('index') }}" class="logo">
+                微光成炬 · 羽映万生
+                <span>林学院</span>
+            </a>
+            <button class="menu-toggle" id="menuToggle" aria-label="菜单">☰</button>
+            <ul class="nav-links" id="navLinks">
+                <li><a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">首页</a></li>
+                <li><a href="{{ url_for('all_works') }}" class="{% if request.endpoint == 'all_works' %}active{% endif %}">优秀作品</a></li>
+                <li><a href="{{ url_for('recruit') }}" class="{% if request.endpoint == 'recruit' %}active{% endif %}">宣讲团</a></li>
+                <li><a href="{{ url_for('statement') }}" class="{% if request.endpoint == 'statement' %}active{% endif %}">声明</a></li>
+                <li><a href="{{ url_for('reviewer_login') }}" class="btn-review">评审登录</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="footer-logos">
+            <span>林学院综合素质考评中心</span>
+            <span>·</span>
+            <span>世界候鸟日</span>
+            <span>·</span>
+            <span>世界生物多样性日</span>
+        </div>
+        <p>作品版权归原作者所有 · 本站仅用于展示与记录</p>
+        <p style="margin-top:0.2rem; font-size:0.75rem;">微光成炬，羽映万生 · 2026</p>
+    </footer>
+
+    <!-- 作品详情模态框 -->
+    <div class="modal" id="workModal" onclick="closeModal()">
+        <div class="modal-content" onclick="event.stopPropagation();">
+            <button class="modal-close" onclick="closeModal()">✕</button>
+            <img id="modalImg" class="modal-img" src="" alt="作品图片">
+            <h3 id="modalTitle"></h3>
+            <div class="modal-meta">
+                <span id="modalAuthor"></span>
+                <span id="modalCategory"></span>
+                <span id="modalVotes" class="vote-display">⭐ 0</span>
+            </div>
+            <div id="modalFile" style="margin:0.4rem 0;"></div>
+            <div id="modalDesc" class="modal-desc"></div>
+            <div id="modalContent" class="modal-body-text"></div>
+        </div>
+    </div>
+
+    <script>
+        const navbar = document.getElementById('navbar');
+        window.addEventListener('scroll', function() {
+            if (window.scrollY > 20) navbar.classList.add('scrolled');
+            else navbar.classList.remove('scrolled');
+        });
+        document.getElementById('menuToggle').addEventListener('click', function() {
+            document.getElementById('navLinks').classList.toggle('show');
+        });
+        document.addEventListener('click', function(e) {
+            const nav = document.getElementById('navLinks');
+            const toggle = document.getElementById('menuToggle');
+            if (nav && toggle && !nav.contains(e.target) && !toggle.contains(e.target)) {
+                nav.classList.remove('show');
+            }
+        });
+
+        function showModal(workId) {
+            fetch('/work/' + workId)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) return;
+                    document.getElementById('modalTitle').textContent = data.title;
+                    document.getElementById('modalAuthor').textContent = '✍️ ' + data.author;
+                    document.getElementById('modalCategory').textContent = '📂 ' + data.category;
+                    document.getElementById('modalVotes').textContent = '⭐ ' + data.votes;
+                    document.getElementById('modalDesc').textContent = data.description || '';
+                    document.getElementById('modalContent').textContent = data.content || '';
+                    if (data.image) {
+                        document.getElementById('modalImg').src = '/static/uploads/' + data.image;
+                        document.getElementById('modalImg').style.display = 'block';
+                    } else {
+                        document.getElementById('modalImg').style.display = 'none';
+                    }
+                    if (data.file) {
+                        document.getElementById('modalFile').innerHTML = '<a href="/static/uploads/' + data.file + '" target="_blank" class="btn btn-secondary btn-sm">📎 查看附件</a>';
+                    } else {
+                        document.getElementById('modalFile').innerHTML = '';
+                    }
+                    document.getElementById('workModal').style.display = 'flex';
+                    document.body.style.overflow = 'hidden';
+                });
+        }
+
+        function closeModal() {
+            document.getElementById('workModal').style.display = 'none';
+            document.body.style.overflow = '';
+        }
+
+        window.showModal = showModal;
+        window.closeModal = closeModal;
+    </script>
+</body>
+</html>

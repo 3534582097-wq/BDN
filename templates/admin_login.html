@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:center; min-height:80vh; padding:2rem;">
+    <div class="admin-card" style="max-width:400px; width:100%; text-align:center;">
+        <h2>管理员登录</h2>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for cat, msg in messages %}
+                    <div class="flash flash-{{ cat }}">{{ msg }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        <form method="post">
+            <div class="form-group"><label>用户名</label><input type="text" name="username" required></div>
+            <div class="form-group"><label>密码</label><input type="password" name="password" required></div>
+            <button type="submit" class="btn btn-primary" style="width:100%;">登录后台</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
