@@ -93,6 +93,15 @@ def make_upload_filename(original_name, used_names=None):
         counter += 1
     return name
 
+# ---------- 模板函数 ----------
+@app.context_processor
+def utility_processor():
+    def file_url(filename):
+        if not filename:
+            return ''
+        return url_for('static', filename='uploads/' + filename)
+    return dict(file_url=file_url)
+
 # ---------- 初始化 ----------
 def init_db():
     db.create_all()
