@@ -23,10 +23,54 @@
                 </select></div>
                 <div class="form-group"><label>简介</label><textarea name="description"></textarea></div>
                 <div class="form-group"><label>正文（征文/诗歌）</label><textarea name="content"></textarea></div>
-                <div class="form-group"><label>图片</label><input type="file" name="image" accept="image/*"></div>
+                <div class="form-group"><label>图片/视频</label><input type="file" name="image" accept="image/*,video/*"></div>
                 <div class="form-group"><label>附件</label><input type="file" name="file"></div>
                 <button type="submit" class="btn btn-primary">上传</button>
             </form>
+        </div>
+
+        <!-- 批量上传卡片 -->
+        <div class="admin-card">
+            <h3>📦 批量上传作品（最多10个）</h3>
+            <form method="post" enctype="multipart/form-data" id="batchForm">
+                <input type="hidden" name="batch_upload" value="1">
+                <div id="batchFields">
+                    <div class="batch-item" style="border:1px solid #e8e8e8; padding:1rem; margin-bottom:1rem; border-radius:12px;">
+                        <div class="form-group"><label>标题</label><input type="text" name="title[]" required></div>
+                        <div class="form-group"><label>作者</label><input type="text" name="author[]" placeholder="默认为匿名"></div>
+                        <div class="form-group"><label>类别</label>
+                            <select name="category[]">
+                                <option>摄影</option><option>征文</option><option>海报</option><option>诗歌</option><option>绘画</option><option>手工制品</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label>简介</label><textarea name="description[]"></textarea></div>
+                        <div class="form-group"><label>正文（征文/诗歌）</label><textarea name="content[]"></textarea></div>
+                        <div class="form-group"><label>图片/视频</label><input type="file" name="image[]" accept="image/*,video/*"></div>
+                        <div class="form-group"><label>附件</label><input type="file" name="file[]"></div>
+                    </div>
+                </div>
+                <div style="display:flex; gap:1rem;">
+                    <button type="button" class="btn btn-secondary" onclick="addBatchItem()">➕ 添加作品</button>
+                    <button type="submit" class="btn btn-primary">批量上传</button>
+                </div>
+            </form>
+            <script>
+                function addBatchItem() {
+                    var container = document.getElementById('batchFields');
+                    var firstItem = container.querySelector('.batch-item');
+                    var newItem = firstItem.cloneNode(true);
+                    newItem.querySelectorAll('input, textarea, select').forEach(el => {
+                        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.value = '';
+                        if (el.tagName === 'SELECT') el.selectedIndex = 0;
+                    });
+                    var count = container.querySelectorAll('.batch-item').length;
+                    if (count >= 10) {
+                        alert('最多同时上传10个作品');
+                        return;
+                    }
+                    container.appendChild(newItem);
+                }
+            </script>
         </div>
 
         <div class="admin-card">

@@ -35,8 +35,11 @@
             <div class="work-grid {{ 'images' if section.type == 'image' else 'texts' }}">
                 {% for work in section.works %}
                 <div class="work-card" data-id="{{ work.id }}" onclick="showModal({{ work.id }})">
-                    {% if work.image %}
-                    <div class="card-img" style="background-image: url('/static/uploads/{{ work.image }}');">
+                    {% if work.is_video %}
+                    <video class="card-video" src="{{ file_url(work.image) }}" muted preload="metadata" onmouseover="this.play()" onmouseout="this.pause()"></video>
+                    <span class="card-type-badge">{{ work.category }}</span>
+                    {% elif work.image %}
+                    <div class="card-img" style="background-image: url('{{ file_url(work.image) }}');">
                         <span class="card-type-badge">{{ work.category }}</span>
                     </div>
                     {% else %}
@@ -50,7 +53,7 @@
                         <p class="card-author">{{ work.author }}</p>
                         {% if work.description %}<p class="card-desc">{{ work.description }}</p>{% endif %}
                         <div class="card-footer">
-                            <span class="card-stars">{% for i in range(work.votes) %}★{% else %}暂无投票{% endfor %}</span>
+                            <span class="card-stars">{{ '★' * (work.votes if work.votes <= 5 else 5) }}{% if work.votes > 5 %}…{% elif work.votes == 0 %}暂无投票{% endif %}</span>
                             <span class="card-vote-count">{{ work.votes }} 票</span>
                         </div>
                     </div>
@@ -72,8 +75,11 @@
         <div class="work-grid images">
             {% for work in works %}
             <div class="work-card" data-id="{{ work.id }}" onclick="showModal({{ work.id }})">
-                {% if work.image %}
-                <div class="card-img" style="background-image: url('/static/uploads/{{ work.image }}');">
+                {% if work.is_video %}
+                <video class="card-video" src="{{ file_url(work.image) }}" muted preload="metadata" onmouseover="this.play()" onmouseout="this.pause()"></video>
+                <span class="card-type-badge">{{ work.category }}</span>
+                {% elif work.image %}
+                <div class="card-img" style="background-image: url('{{ file_url(work.image) }}');">
                     <span class="card-type-badge">{{ work.category }}</span>
                 </div>
                 {% else %}
@@ -87,7 +93,7 @@
                     <p class="card-author">{{ work.author }}</p>
                     {% if work.description %}<p class="card-desc">{{ work.description }}</p>{% endif %}
                     <div class="card-footer">
-                        <span class="card-stars">{% for i in range(work.votes) %}★{% else %}暂无投票{% endfor %}</span>
+                        <span class="card-stars">{{ '★' * (work.votes if work.votes <= 5 else 5) }}{% if work.votes > 5 %}…{% elif work.votes == 0 %}暂无投票{% endif %}</span>
                         <span class="card-vote-count">{{ work.votes }} 票</span>
                     </div>
                 </div>

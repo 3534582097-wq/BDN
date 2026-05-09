@@ -44,7 +44,8 @@
     <div class="modal" id="workModal" onclick="closeModal()">
         <div class="modal-content" onclick="event.stopPropagation();">
             <button class="modal-close" onclick="closeModal()">✕</button>
-            <img id="modalImg" class="modal-img" src="" alt="作品图片">
+            <img id="modalImg" class="modal-img" src="" alt="作品图片" style="display:block;">
+            <video id="modalVideo" class="modal-video" controls style="display:none;"></video>
             <h3 id="modalTitle"></h3>
             <div class="modal-meta">
                 <span id="modalAuthor"></span>
@@ -85,14 +86,23 @@
                     document.getElementById('modalVotes').textContent = '⭐ ' + data.votes;
                     document.getElementById('modalDesc').textContent = data.description || '';
                     document.getElementById('modalContent').textContent = data.content || '';
-                    if (data.image) {
-                        document.getElementById('modalImg').src = '/static/uploads/' + data.image;
-                        document.getElementById('modalImg').style.display = 'block';
+
+                    var img = document.getElementById('modalImg');
+                    var video = document.getElementById('modalVideo');
+                    if (data.is_video) {
+                        img.style.display = 'none';
+                        video.style.display = 'block';
+                        video.src = data.image;
+                    } else if (data.image) {
+                        img.style.display = 'block';
+                        video.style.display = 'none';
+                        img.src = data.image;
                     } else {
-                        document.getElementById('modalImg').style.display = 'none';
+                        img.style.display = 'none';
+                        video.style.display = 'none';
                     }
                     if (data.file) {
-                        document.getElementById('modalFile').innerHTML = '<a href="/static/uploads/' + data.file + '" target="_blank" class="btn btn-secondary btn-sm">📎 查看附件</a>';
+                        document.getElementById('modalFile').innerHTML = '<a href="' + data.file + '" target="_blank" class="btn btn-secondary btn-sm">📎 查看附件</a>';
                     } else {
                         document.getElementById('modalFile').innerHTML = '';
                     }
