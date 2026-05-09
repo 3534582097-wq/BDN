@@ -13,44 +13,17 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24).hex())
 
-# ---------- 持久化 ----------
+# ---- 数据持久化（Zeabur 持久卷挂载点） ----
 basedir = os.path.abspath(os.path.dirname(__file__))
-DATA_DIR = os.path.join(basedir, 'instance')
-UPLOAD_DIR = os.path.join(basedir, 'static', 'uploads')
+DATA_DIR = os.path.join(basedir, 'data')                 # 挂载 /app/data
+UPLOAD_DIR = os.path.join(basedir, 'static', 'uploads')  # 挂载 /app/static/uploads
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# ----- 数据库 (PostgreSQL / SQLite) -----
-DATABASE_URL = os.environ.get('DATABASE_URL')
-if DATABASE_URL:
-    # Zeabur 等云平台使用 PostgreSQL
-    app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
-else:
-    # 本地开发使用 SQLite
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(DATA_DIR, 'works.db')
-
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///' + os.path.join(DATA_DIR, 'works.db'))
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['UPLOAD_FOLDER'] = UPLOAD_DIR
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB
-
-# ----- S3 对象存储配置 -----
-S3_ENABLED = bool(os.environ.get('S3_BUCKET'))
-if S3_ENABLED:
-    import boto3
-    s3_client = boto3.client(
-        's3',
-        endpoint_url=os.environ.get('S3_ENDPOINT'),
-        region_name=os.environ.get('S3_REGION', 'auto'),
-        aws_access_key_id=os.environ.get('S3_ACCESS_KEY'),
-        aws_secret_access_key=os.environ.get('S3_SECRET_KEY'),
-    )
-    S3_BUCKET = os.environ['S3_BUCKET']
-    S3_PUBLIC_URL = os.environ.get('S3_PUBLIC_URL', '').rstrip('/')
-    logger.info(f"S3 存储已启用，桶: {S3_BUCKET}")
-else:
-    s3_client = None
-    S3_BUCKET = ''
-    S3_PUBLIC_URL = ''
-    logger.info("使用本地文件存储")
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'mp4', 'mov', 'avi', 'webm'}
 
@@ -88,96 +61,13 @@ class Setting(db.Model):
     key = db.Column(db.String(50), primary_key=True)
     value = db.Column(db.Text, default='')
 
-# ---------- 文件存储抽象层 ----------
-
-def _save_file_local(filename, file_obj):
-    """保存文件到本地"""
-    dest = os.path.join(UPLOAD_DIR, filename)
-    file_obj.save(dest)
-    logger.info(f"文件已保存到本地: {filename}")
-
-def _delete_file_local(filename):
-    """删除本地文件"""
-    try:
-        os.remove(os.path.join(UPLOAD_DIR, filename))
-    except Exception:
-        pass
-
-def _save_file_s3(filename, file_obj):
-    """上传文件到 S3"""
-    file_obj.seek(0)
-    s3_client.upload_fileobj(file_obj, S3_BUCKET, 'uploads/' + filename,
-                             ExtraArgs={'ACL': 'public-read'})
-    logger.info(f"文件已上传到 S3: {filename}")
-
-def _delete_file_s3(filename):
-    """从 S3 删除文件"""
-    try:
-        s3_client.delete_object(Bucket=S3_BUCKET, Key='uploads/' + filename)
-    except Exception:
-        pass
-
-def save_upload(filename, file_obj):
-    """保存上传的文件（自动选择 S3 或本地）"""
-    filename = secure_filename(filename)
-    if S3_ENABLED:
-        _save_file_s3(filename, file_obj)
-    else:
-        _save_file_local(filename, file_obj)
-    return filename
-
-def delete_upload(filename):
-    """删除上传的文件"""
-    if not filename:
-        return
-    if S3_ENABLED:
-        _delete_file_s3(filename)
-    else:
-        _delete_file_local(filename)
-
-def get_file_url(filename):
-    """获取文件的公开访问 URL"""
-    if not filename:
-        return ''
-    if S3_ENABLED:
-        return f"{S3_PUBLIC_URL}/uploads/{filename}"
-    return url_for('static', filename='uploads/' + filename)
-
-# Jinja2 模板上下文：所有模板都可以使用 file_url() 函数
-@app.context_processor
-def inject_file_url():
-    return dict(file_url=get_file_url)
-
-def make_upload_filename(original_name, used_names=None):
-    """生成唯一的文件名（处理重名冲突）"""
-    name = secure_filename(original_name)
-    if used_names is None:
-        used_names = set()
-    base, ext = os.path.splitext(name)
-    counter = 1
-    while name in used_names or _file_exists(name):
-        name = f"{base}_{counter}{ext}"
-        counter += 1
-    return name
-
-def _file_exists(filename):
-    """检查文件是否已存在（S3 或本地）"""
-    if S3_ENABLED:
-        try:
-            s3_client.head_object(Bucket=S3_BUCKET, Key='uploads/' + filename)
-            return True
-        except Exception:
-            return False
-    else:
-        return os.path.exists(os.path.join(UPLOAD_DIR, filename))
-
 # ---------- 通用函数 ----------
 def get_setting(key):
-    s = Setting.query.filter_by(key=key).first()
+    s = db.session.get(Setting, key)
     return s.value if s else ''
 
 def set_setting(key, val):
-    s = Setting.query.filter_by(key=key).first()
+    s = db.session.get(Setting, key)
     if s:
         s.value = val
     else:
@@ -191,6 +81,18 @@ def is_video_file(filename):
     ext = filename.rsplit('.', 1)[1].lower()
     return ext in {'mp4', 'mov', 'avi', 'webm'}
 
+def make_upload_filename(original_name, used_names=None):
+    """生成唯一的文件名（处理重名冲突）"""
+    name = secure_filename(original_name)
+    if used_names is None:
+        used_names = set()
+    base, ext = os.path.splitext(name)
+    counter = 1
+    while name in used_names or os.path.exists(os.path.join(UPLOAD_DIR, name)):
+        name = f"{base}_{counter}{ext}"
+        counter += 1
+    return name
+
 # ---------- 初始化 ----------
 def init_db():
     db.create_all()
@@ -203,32 +105,13 @@ def init_db():
     if not db.session.get(Setting, 'results_published'):
         set_setting('results_published', 'false')
     if not db.session.get(Setting, 'declaration_content'):
-        set_setting('declaration_content', '<div class="statement-container"><p>本活动……（原声明内容保持不变）</p></div>')
+        set_setting('declaration_content',
+            '<style> .statement-container { max-width: 800px; margin: 40px auto; padding: 30px 35px; font-family: \'Segoe UI\', \'Microsoft YaHei\', sans-serif; line-height: 1.8; color: #2c3e50; background: #ffffff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); border: 1px solid #e8ecef; } .statement-container p { margin: 16px 0; text-indent: 2em; position: relative; padding-left: 0; } .statement-container p::before { content: "●"; color: #3ba86c; font-size: 10px; position: absolute; left: 1.2em; top: 0.4em; } .statement-container p:first-child { margin-top: 0; } .statement-container p:last-child { margin-bottom: 0; } .statement-container strong { color: #1e4a3b; } @media (max-width: 600px) { .statement-container { padding: 20px 16px; margin: 20px 10px; } } </style> <div class="statement-container"> <p>本活动"微光成炬，羽映万生"生态公益宣讲团及作品征集由林学院主办，旨在提高师生对鸟类保护及生态环境的关注。所有投稿作品须为原创，不得侵犯他人著作权。主办方有权在非商业用途下对作品进行展示、宣传，使用时将注明作者。</p> <p>本次活动公告、宣发内容解释权由林学院综合素质考评中心持有。</p> <p>本活动优秀作品评选结果解释权由林学院综合素质考评中心所有。</p> </div>')
     if not db.session.get(Setting, 'recruit_content'):
-        set_setting('recruit_content', '<div class="recruit-container"><h3>关于组建……（原内容保持不变）</h3>……</div>')
+        set_setting('recruit_content',
+            '<style> .recruit-container { max-width: 900px; margin: 0 auto; padding: 30px 20px; font-family: \'Segoe UI\', \'Microsoft YaHei\', sans-serif; line-height: 1.8; color: #333; background: #fafbfc; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,60,30,0.08); } .recruit-container h3 { font-size: 22px; color: #1e4a3b; border-left: 5px solid #3ba86c; padding-left: 16px; margin-top: 0; margin-bottom: 20px; } .recruit-container h4 { font-size: 18px; color: #1e4a3b; margin-top: 28px; margin-bottom: 10px; border-bottom: 2px solid #d4e8d8; padding-bottom: 6px; } .recruit-container p { margin: 10px 0; } .recruit-container ol { padding-left: 24px; margin: 12px 0; } .recruit-container ol li { margin-bottom: 10px; padding-left: 8px; } .recruit-container strong { color: #c0392b; font-weight: 600; } .recruit-container a { color: #2a7a4b; text-decoration: none; font-weight: 600; } .recruit-container a:hover { text-decoration: underline; } .recruit-container .note { color: #7f8c8d; font-size: 0.9em; border-top: 1px dashed #ccc; padding-top: 14px; margin-top: 24px; } @media (max-width: 600px) { .recruit-container { padding: 16px; } .recruit-container h3 { font-size: 18px; } } </style> <div class="recruit-container"> <h3>关于组建林学院"微光成炬，羽映万生"世界候鸟日与世界生物多样性日活动生态公益宣讲团的通知</h3> <p>为切实提升"微光成炬，羽映万生"世界候鸟日与世界生物多样性日主题作品征集宣传活动的公益属性与时代价值，担负起生态文明教育与人才培养方面的独特使命，更好地以青春创意响应全球生态保护号召，特组建本批生态公益宣讲团。</p> <h4>一、招募人数</h4> <p>6‑7 人</p> <h4>二、面向对象</h4> <p>林学院 24、25 级本科生</p> <h4>三、招募要求</h4> <ol> <li>热爱生态文明事业，对自然教育、生态保护教育有浓厚兴趣。</li> <li>政治立场坚定，拥护且自觉践行习近平生态文明思想，无不良行为与失信记录。</li> <li>具备良好的语言表达能力和感染力，善于用青少年喜闻乐见的方式传授候鸟保护与生物多样性知识。</li> <li>对候鸟保护与世界多样性保护有一定的知识基础，并且乐于在备课实践中持续学习，将知识融会贯通。</li> <li>对宣讲任务有责任心，有时间精力参与备课与授课全过程，坚持一始而终，对青少年有善心、有耐心、有爱心，对自己能完成授课有信心。</li> <li>有主持、演讲、志愿服务和相关实践经历者优先。</li> </ol> <h4>四、报名方式</h4> <p><strong>附件："微光成炬，羽映万生"生态公益宣讲团报名表</strong></p> <p>报名者需要如实填写报名表，文件命名为"姓名+宣讲团报名"，于 <strong>5 月 11 日 18:00 前</strong> 发送至指定邮箱 <a href="mailto:3534582097@qq.com">3534582097@qq.com</a>。若由于超时、联系信息填写错误、邮件地址填写错误等原因导致的报名失败，我方将不接受申诉，附件及详细联系方式查见通知群。</p> <p class="note">本活动最终解释权归林学院综合素质考评中心所有。</p> </div>')
     db.session.commit()
     logger.info("数据库初始化完成")
-
-def self_check():
-    logger.info("开始自检...")
-    if not os.path.exists(DATA_DIR):
-        logger.error(f"数据目录 {DATA_DIR} 不存在")
-    else:
-        logger.info(f"数据目录 {DATA_DIR} 存在")
-    if not os.path.exists(UPLOAD_DIR):
-        logger.error(f"上传目录 {UPLOAD_DIR} 不存在")
-    else:
-        logger.info(f"上传目录 {UPLOAD_DIR} 存在")
-    try:
-        db.create_all()
-        logger.info("数据库表已就绪")
-    except Exception as e:
-        logger.error(f"数据库表创建失败: {e}")
-    required_fields = ['title', 'author', 'category', 'is_video']
-    for field in required_fields:
-        if not hasattr(Work, field):
-            logger.error(f"Work 模型缺少字段 {field}")
-    logger.info("自检完成")
 
 # ---------- 路由 ----------
 @app.route('/')
@@ -272,10 +155,8 @@ def work_detail(work_id):
         'category': work.category,
         'description': work.description,
         'content': work.content,
-        'image': get_file_url(work.image),
-        'file': get_file_url(work.file),
-        'image_name': work.image,
-        'file_name': work.file,
+        'image': work.image,
+        'file': work.file,
         'is_video': work.is_video,
         'votes': work.votes
     })
@@ -302,7 +183,7 @@ def review():
         session.pop('reviewer_id', None)
         return redirect(url_for('reviewer_login'))
     if reviewer.has_voted:
-        flash('您已经投过票了', 'warning')
+        flash('您已经投过票了，每个评审员仅能投票一次', 'warning')
         return redirect(url_for('index'))
     if get_setting('review_open') != 'true':
         flash('评审通道已关闭', 'warning')
@@ -315,7 +196,7 @@ def review():
                 work.votes += 1
         reviewer.has_voted = True
         db.session.commit()
-        flash('评审提交成功', 'success')
+        flash('评审提交成功，感谢您的参与！', 'success')
         return redirect(url_for('index'))
     works = Work.query.all()
     return render_template('review.html', works=works)
@@ -366,14 +247,14 @@ def admin():
                     if allowed_file(f.filename):
                         img_name = make_upload_filename(f.filename, used_names)
                         used_names.add(img_name)
-                        save_upload(img_name, f)
+                        f.save(os.path.join(UPLOAD_DIR, img_name))
                         is_vid = is_video_file(img_name)
                 file_name = ''
                 if i < len(file_files) and file_files[i] and file_files[i].filename:
                     f = file_files[i]
                     file_name = make_upload_filename(f.filename, used_names)
                     used_names.add(file_name)
-                    save_upload(file_name, f)
+                    f.save(os.path.join(UPLOAD_DIR, file_name))
                 work = Work(title=title, author=author, category=category,
                             description=description, content=content,
                             image=img_name, file=file_name, is_video=is_vid,
@@ -396,9 +277,11 @@ def admin():
             image_name = ''
             file_name = ''
             if image_file and image_file.filename and allowed_file(image_file.filename):
-                image_name = save_upload(image_file.filename, image_file)
+                image_name = secure_filename(image_file.filename)
+                image_file.save(os.path.join(UPLOAD_DIR, image_name))
             if file_file and file_file.filename:
-                file_name = save_upload(file_file.filename, file_file)
+                file_name = secure_filename(file_file.filename)
+                file_file.save(os.path.join(UPLOAD_DIR, file_name))
             is_vid = is_video_file(image_name) if image_name else False
             work = Work(title=title, author=author, category=category,
                         description=description, content=content,
@@ -412,8 +295,12 @@ def admin():
             work_id = int(request.form['delete_work'])
             work = db.session.get(Work, work_id)
             if work:
-                delete_upload(work.image)
-                delete_upload(work.file)
+                for fname in (work.image, work.file):
+                    if fname:
+                        try:
+                            os.remove(os.path.join(UPLOAD_DIR, fname))
+                        except:
+                            pass
                 db.session.delete(work)
                 db.session.commit()
                 flash('作品已删除', 'success')
@@ -462,12 +349,13 @@ def admin():
 
     works = Work.query.order_by(Work.created_at.desc()).all()
     reviewers = Reviewer.query.all()
-    decl_setting = Setting.query.filter_by(key='declaration_content').first()
-    rec_setting = Setting.query.filter_by(key='recruit_content').first()
+    admins = Admin.query.all()
+    decl_setting = db.session.get(Setting, 'declaration_content')
+    rec_setting = db.session.get(Setting, 'recruit_content')
     review_open = get_setting('review_open')
     results_published = get_setting('results_published')
     return render_template('admin.html',
-                           works=works, reviewers=reviewers,
+                           works=works, reviewers=reviewers, admins=admins,
                            declaration=decl_setting, recruit_content=rec_setting,
                            review_open=review_open, results_published=results_published)
 
@@ -533,7 +421,6 @@ def logout():
 if __name__ == '__main__':
     with app.app_context():
         init_db()
-        self_check()
     port = int(os.environ.get('PORT', 8080))
     debug = os.environ.get('FLASK_DEBUG', '0') == '1'
     app.run(debug=debug, host='0.0.0.0', port=port)
