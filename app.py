@@ -418,9 +418,11 @@ def logout():
     session.clear()
     return redirect(url_for('index'))
 
+# 启动时初始化数据库（确保 Gunicorn 导入时也会执行）
+with app.app_context():
+    init_db()
+
 if __name__ == '__main__':
-    with app.app_context():
-        init_db()
     port = int(os.environ.get('PORT', 8080))
     debug = os.environ.get('FLASK_DEBUG', '0') == '1'
     app.run(debug=debug, host='0.0.0.0', port=port)
