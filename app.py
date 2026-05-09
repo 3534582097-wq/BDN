@@ -7,14 +7,21 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.secret_key = 'change-this-to-random-secret'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///works.db'
+
+# ---- 数据持久化配置（Zeabur 持久卷挂载点） ----
+basedir = os.path.abspath(os.path.dirname(__file__))
+DATA_DIR = os.path.join(basedir, 'data')               # 挂载 /app/data
+os.makedirs(DATA_DIR, exist_ok=True)
+UPLOAD_DIR = os.path.join(basedir, 'static', 'uploads') # 挂载 /app/static/uploads
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(DATA_DIR, 'works.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads')
+app.config['UPLOAD_FOLDER'] = UPLOAD_DIR                # 绝对路径
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp'}
 
 db = SQLAlchemy(app)
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # ---------- 数据库模型 ----------
 class Work(db.Model):
@@ -45,7 +52,7 @@ class Reviewer(db.Model):
 
 class Setting(db.Model):
     key = db.Column(db.String(50), primary_key=True)
-    value = db.Column(db.Text, default='')  # 使用 Text 容纳长内容
+    value = db.Column(db.Text, default='')
 
 # ---------- 辅助函数 ----------
 def get_setting(key):
@@ -208,7 +215,6 @@ def admin():
                 image_name = secure_filename(image_file.filename)
                 image_file.save(os.path.join(app.config['UPLOAD_FOLDER'], image_name))
             if file_file and file_file.filename:
-                # 附件不限制类型
                 file_name = secure_filename(file_file.filename)
                 file_file.save(os.path.join(app.config['UPLOAD_FOLDER'], file_name))
 
