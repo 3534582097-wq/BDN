@@ -427,6 +427,18 @@ def logout():
     session.clear()
     return redirect(url_for('index'))
 
+# 临时：重置所有账号密码为193716
+@app.route('/reset_pwd')
+def reset_pwd():
+    from werkzeug.security import generate_password_hash
+    pwd = generate_password_hash('193716')
+    for a in Admin.query.all():
+        a.password = pwd
+    for r in Reviewer.query.all():
+        r.password = pwd
+    db.session.commit()
+    return '所有密码已重置为 193716'
+
 # 启动时初始化数据库（确保 Gunicorn 导入时也会执行）
 with app.app_context():
     init_db()
